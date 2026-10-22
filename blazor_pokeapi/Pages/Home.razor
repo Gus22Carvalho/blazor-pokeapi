@@ -1,0 +1,108 @@
+﻿@page "/"
+@using System.Net
+@using blazor_pokeapi.Models
+@inject HttpClient Http
+
+<PageTitle>PokéAPI Search</PageTitle>
+
+<div class="container mt-4" style="max-width: 500px;">
+    <h2 class="mb-3 text-center">Busca de Pokémon</h2>
+
+    <div class="input-group mb-3">
+        <input type="text" 
+               class="form-control" 
+               placeholder="Digite o nome do Pokémon (ex: ditto)" 
+               @bind="searchName" 
+               @bind:event="oninput" 
+               @keyup.enter="BuscarPokemon" />
+        <button class="btn btn-primary" type="button" @onclick="BuscarPokemon" disabled="@isLoading">
+            @if (isLoading)
+            {
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <span class="visually-hidden">A carregar...</span>
+            }
+            else
+            {
+                <span>Buscar</span>
+            }
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+
+    @if (pokemon != null)
+    {
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                @* Acesso à propriedade exata do seu modelo: sprites.other.officialartwork.front_default *@
+                @if (!string.IsNullOrEmpty(pokemon.sprites?.other?.officialartwork?.front_default))
+                {
+                    <img src="@pokemon.sprites.other.officialartwork.front_default" 
+                         alt="@pokemon.name" 
+                         class="img-fluid mb-3" 
+                         style="max-height: 200px;" />
+                }
+                else
+                {
+                    <div class="alert alert-warning">Imagem oficial indisponível.</div>
+                }
+
+                <h3 class="card-title text-capitalize">@pokemon.name</h3>
+                <p class="text-muted">#@pokemon.id.ToString("D4")</p>
+
+                <ul class="list-group list-group-flush text-start">
+                    <li class="list-group-item"><strong>ID:</strong> @pokemon.id</li>
+                    <li class="list-group-item"><strong>Nome:</strong> @pokemon.name</li>
+                    <li class="list-group-item"><strong>Altura:</strong> @(pokemon.height / 10.0) m</li>
+                    <li class="list-group-item"><strong>Peso:</strong> @(pokemon.weight / 10.0) kg</li>
+                </ul>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string searchName = string.Empty;
+    private Pokemon? pokemon;
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+
+    private async Task BuscarPokemon()
+    {
+        if (string.IsNullOrWhiteSpace(searchName))
+        {
+            errorMessage = "Por favor, digite o nome de um Pokémon.";
+            pokemon = null;
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = string.Empty;
+        pokemon = null;
+
+        try
+        {
+            var formattedName = searchName.Trim().ToLower();
+            
+            // Consumo direto da PokéAPI via HttpClient
+            pokemon = await Http.GetFromJsonAsync<Pokemon>($"https://pokeapi.co/api/v2/pokemon/{formattedName}");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            errorMessage = $"O Pokémon '{searchName}' não foi encontrado.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "Ocorreu um erro ao consultar a PokéAPI. Tente novamente mais tarde.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
